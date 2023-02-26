@@ -16,6 +16,8 @@ from pwnagotchi.ui.components import *
 from pwnagotchi.ui.state import State
 from pwnagotchi.voice import Voice
 
+import RPi.GPIO as GPIO
+
 WHITE = 0xff
 BLACK = 0x00
 ROOT = None
@@ -91,6 +93,19 @@ class View(object):
             self._ignore_changes = ('uptime', 'name')
 
         ROOT = self
+
+
+        self.update_screen = False
+        gpio = int(5)
+        logging.info("GPIO buttion is " + str(gpio))
+        # set gpio numbering
+        GPIO.setmode(GPIO.BCM)
+
+        GPIO.setup(gpio, GPIO.IN, GPIO.PUD_UP)
+        GPIO.add_event_detect(gpio, GPIO.FALLING, callback=self.updateScreen, bouncetime=600)
+
+    def updateScreen(self, channel):
+        self.update_screen = True
 
     def set_agent(self, agent):
         self._agent = agent
@@ -361,27 +376,30 @@ class View(object):
         self.update()
 
     def update(self, force=False, new_data={}):
-        for key, val in new_data.items():
-            self.set(key, val)
+        if self.update_screen:
+            self.update_screen = False
+            for key, val in new_data.items():
+                self.set(key, val)
 
-        with self._lock:
-            if self._frozen:
-                return
+            with self._lock:
+                if self._frozen:
+                    return
 
-            state = self._state
-            changes = state.changes(ignore=self._ignore_changes)
-            if force or len(changes):
-                self._canvas = Image.new('1', (self._width, self._height), WHITE)
-                drawer = ImageDraw.Draw(self._canvas)
+                state = self._state
+                changes = state.changes(ignore=self._ignore_changes)
+                if force or len(changes):
+                    self._canvas = Image.new('1', (self._width, self._height), WHITE)
+                    drawer = ImageDraw.Draw(self._canvas)
 
-                plugins.on('ui_update', self)
+                    plugins.on('ui_update', self)
 
-                for key, lv in state.items():
-                    lv.draw(self._canvas, drawer)
+                    for key, lv in state.items():
+                        lv.draw(self._canvas, drawer)
 
-                web.update_frame(self._canvas)
+                    web.update_frame(self._canvas)
 
-                for cb in self._render_cbs:
-                    cb(self._canvas)
+                    for cb in self._render_cbs:
+                        cb(self._canvas)
 
-                self._state.reset()
+                    self._state.reset()
+
