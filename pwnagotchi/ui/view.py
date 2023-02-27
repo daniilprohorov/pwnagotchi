@@ -94,15 +94,14 @@ class View(object):
 
         ROOT = self
 
-
         self.update_screen = False
         gpio = int(5)
-        logging.info("GPIO buttion is " + str(gpio))
-        # set gpio numbering
         GPIO.setmode(GPIO.BCM)
 
         GPIO.setup(gpio, GPIO.IN, GPIO.PUD_UP)
-        GPIO.add_event_detect(gpio, GPIO.FALLING, callback=self.updateScreen, bouncetime=600)
+        GPIO.add_event_detect(gpio, GPIO.FALLING, callback=self.updateScreen, bouncetime=1000)
+        self.UPDATE_TIME = int(config['ui']['update_time'])
+        self.last_update_time = time.time()
 
     def updateScreen(self, channel):
         self.update_screen = True
@@ -376,7 +375,9 @@ class View(object):
         self.update()
 
     def update(self, force=False, new_data={}):
-        if self.update_screen:
+        last_update = int(abs(self.last_update_time - time.time()))
+        if self.update_screen or last_update > self.UPDATE_TIME:
+            self.last_update_time = time.time()
             self.update_screen = False
             for key, val in new_data.items():
                 self.set(key, val)
